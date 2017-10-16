@@ -7,6 +7,10 @@
 
 class ProcessObserver;
 
+/*!
+ \brief Class, responsible for launching of commands from list as child processes.
+ */
+
 class ProcessLauncher final
 {
 	ProcessLauncher(const ProcessLauncher&) = delete;
@@ -18,14 +22,29 @@ public:
 	ProcessLauncher();
 	~ProcessLauncher();
 	
+	/*!
+	 * Add command to launch to list, thread safe.
+	 \param[in] command Command with arguments, which will be used to launch child process.
+	 */
 	void add_command(const std::string& command) noexcept;
+	/*!
+	 * Main loop of program, which will be parent process.
+	 */
 	void run() noexcept;
-	
+	/*!
+	 * Method to interrupt main loop, for example from signal handler.
+	 */
 	void stop() noexcept;
-	
+	/*!
+	 * Add instance of class, which implements ProcessObserver interface,
+	 * i.e. interested in receiving of notifications about launching of new process.
+	 */
 	void add_process_observer(ProcessObserver* process_observer);
 	
 private:
+	/*!
+	 * Get next command to execute from list, thread safe.
+	 */
 	std::string fetch_command();
 		
 private:

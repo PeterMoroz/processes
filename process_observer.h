@@ -2,6 +2,9 @@
 
 class Process;
 
+/*!
+ \brief Declaration of interface of classes, which are interested in receiving of notification, about new process is created.
+ */
 class ProcessObserver
 {
 public:

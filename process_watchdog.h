@@ -11,6 +11,9 @@
 #include "process_observer.h"
 #include "process_restriction.h"
 
+/*!
+ \brief Class, which is responsible for watching about resource consumption by proceses from the list.
+ */
 
 class ProcessWatchdog final : public ProcessObserver
 {
@@ -20,17 +23,28 @@ class ProcessWatchdog final : public ProcessObserver
 	const ProcessWatchdog& operator=(ProcessWatchdog&&) = delete;
 	
 public:
-	static constexpr unsigned DEFAULT_WATCH_DELAY = 100; // milliseconds
+	/// how long worker thread will sleep, if nothing to watch (milliseconds)
+	static constexpr unsigned DEFAULT_WATCH_DELAY = 100;
 	
 public:
 	explicit ProcessWatchdog(const ProcessRestriction& process_restriction,
 							unsigned watch_delay = DEFAULT_WATCH_DELAY);
 	~ProcessWatchdog();
 	
+	/*!
+	 Start worker thread.
+	 */	
 	void run();
+	/*!
+	 Stop worker thread.
+	 */
 	void stop() noexcept;
 	
-	// implementation of ProcessObserver-interface
+	/// implementation of ProcessObserver-interface
+	/*!
+	 Add process to watching to list and awake worker thread, if it is sleeping.
+	Ensure thread safe access to processes list.
+	 */
 	void add_process(const Process& process) final;
 	
 private:

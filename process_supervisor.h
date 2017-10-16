@@ -11,6 +11,9 @@
 
 class ProcessLauncher; 
 
+/*!
+ \brief Class, which worries about life of processes from observed list, and restart those ones which are not running anymore.
+ */
 class ProcessSupervisor final : public ProcessObserver
 {
 	ProcessSupervisor(const ProcessSupervisor&) = delete;
@@ -19,20 +22,34 @@ class ProcessSupervisor final : public ProcessObserver
 	const ProcessSupervisor& operator=(ProcessSupervisor&&) = delete;
 	
 public:
-	static constexpr unsigned DEFAULT_WATCH_DELAY = 100; // milliseconds
+	/// how long worker thread will sleep, if nothing to watch (milliseconds)
+	static constexpr unsigned DEFAULT_WATCH_DELAY = 100;
 	
 public:
 	explicit ProcessSupervisor(ProcessLauncher& process_launcher,
 							unsigned watch_delay = DEFAULT_WATCH_DELAY);
 	~ProcessSupervisor();
-	
+	/*!
+	 Start worker thread.
+	 */
 	void run();
+	/*!
+	 Stop worker thread.
+	 */
 	void stop() noexcept;
 	
-	// implementation of ProcessObserver-interface
+	/// implementation of ProcessObserver-interface
+	/*!
+	 Add process to watching to list and awake worker thread, if it is sleeping.
+	Ensure thread safe access to processes list.
+	 */
 	void add_process(const Process& process) final;
 	
 private:
+	/*
+	 Worker thread routine. 
+	Goes through list of processes and check if each of them is alive, if no - tells to the process launcher restart it.
+	 */
 	void processes_handler() noexcept;
 	
 private:
