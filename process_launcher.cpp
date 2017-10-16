@@ -3,6 +3,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <cassert>
 #include <cstring>
 
 #include <chrono>
@@ -11,6 +12,8 @@
 #include <thread>
 #include <vector>
 
+#include "process.h"
+#include "process_observer.h"
 #include "process_launcher.h"
 
 
@@ -40,6 +43,7 @@ std::vector<std::string> split(std::string s, char d)
 ProcessLauncher::ProcessLauncher()
 	: _running(false)
 	, _commands()
+	, _observers()
 {
 }
 
@@ -72,7 +76,7 @@ void ProcessLauncher::run() noexcept
 		}
 		else
 		{
-			std::this_thread::sleep_for(std::chrono::milliseconds(100));
+			std::this_thread::sleep_for(std::chrono::seconds(90));
 		}
 		
 		if (!cmd.empty())
@@ -91,6 +95,15 @@ void ProcessLauncher::run() noexcept
 			else
 			{
 				std::cout << "PID " << ::getpid() << " pid " << pid << " command '" << cmd << "'" << std::endl;
+				
+				Process process(pid, cmd);
+				std::list<ProcessObserver*>::iterator it = _observers.begin();
+				while (it != _observers.end())
+				{
+					(*it)->add_process(process);
+					++it;
+				}
+				
 				try {
 					std::thread background_wait = std::thread([=]()
 						{
@@ -105,10 +118,10 @@ void ProcessLauncher::run() noexcept
 			}
 		}
 	}
-		
+	
 	std::vector<std::string> arguments = split(cmd, ' ');
 	static constexpr std::size_t MAX_ARGS = 64;
-	char** args = new char*[arguments.size() + 1];
+	char** args = new char*[arguments.size() + 1];	// Memory leak! Move variable to global scope and register cleanup function by means atexit()
 	//std::cout << " Arguments list: " << std::endl;
 	std::size_t idx = 0;
 	for (; idx < arguments.size() && idx < MAX_ARGS; idx++)
@@ -122,4 +135,10 @@ void ProcessLauncher::run() noexcept
 	{
 		std::cerr << "execvp() failed: " << ::strerror(errno) << std::endl;
 	}
+}
+
+void ProcessLauncher::add_process_observer(ProcessObserver* process_observer)
+{
+	assert(process_observer != NULL);
+	_observers.push_back(process_observer);
 }

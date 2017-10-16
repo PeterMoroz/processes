@@ -4,8 +4,9 @@
 #include <list>
 #include <string>
 
+class ProcessObserver;
 
-class ProcessLauncher
+class ProcessLauncher final
 {
 	ProcessLauncher(const ProcessLauncher&) = delete;
 	const ProcessLauncher& operator=(const ProcessLauncher&) = delete;
@@ -19,7 +20,10 @@ public:
 	void add_command(const std::string& command) noexcept;
 	void run() noexcept;
 	
+	void add_process_observer(ProcessObserver* process_observer);
+		
 private:
 	bool _running;
 	std::list<std::string> _commands;
+	std::list<ProcessObserver*> _observers;
 };
