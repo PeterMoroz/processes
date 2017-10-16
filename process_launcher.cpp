@@ -12,33 +12,10 @@
 #include <thread>
 #include <vector>
 
+#include "utils.h"
 #include "process.h"
 #include "process_observer.h"
 #include "process_launcher.h"
-
-
-std::vector<std::string> split(std::string s, char d)
-{
-	std::vector<std::string> r;
-	
-	std::size_t p0 = 0;
-	std::size_t p1 = s.find_first_of(d);
-	if (p1 == std::string::npos)
-	{
-		r.emplace_back(s);
-		return r;
-	}
-		
-	while (p1 != std::string::npos)
-	{
-		r.emplace_back(s.substr(p0, p1 - p0));
-		p0 = p1 + 1;
-		p1 = s.find_first_of(d, p0);
-	}
-	r.emplace_back(s.substr(p0));
-	
-	return r;
-}
 
 
 ProcessLauncher::ProcessLauncher()
@@ -135,7 +112,7 @@ void ProcessLauncher::run() noexcept
 	if (!cmd.empty())
 	{
 		std::cout << " launcher is going to spawn child process, command: " << cmd << std::endl;
-		std::vector<std::string> arguments = split(cmd, ' ');
+		std::vector<std::string> arguments = utils::split(cmd, ' ');
 		static constexpr std::size_t MAX_ARGS = 64;
 		char** args = new char*[arguments.size() + 1];	// Memory leak! Move variable to global scope and register cleanup function by means atexit()
 		//std::cout << " Arguments list: " << std::endl;
