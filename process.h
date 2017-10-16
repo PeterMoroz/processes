@@ -21,8 +21,22 @@ class Process final
 	using Status = std::map<std::string, std::string>;
 	
 public:
+	Process();
 	Process(pid_t pid, const std::string& cmd_line);
 	~Process();
+	
+	/*!
+	 * Attach instance to existing process.
+	 * \param[in] pid The PID of existing process.
+	 */
+	void attach(pid_t pid);
+
+	/*!
+	 * Clone current process, and substitute child copy by executed program.
+	 * \param[in] cmd_line Command line of program to execute as child process.
+	 * \param[in] run_in_background Flag which tells, if executed process 
+	 */
+	void create(const std::string& cmd_line, bool run_in_background=false);
 
 	/*!
 	 * Send SIGINT to process, dont't wait.
@@ -63,8 +77,8 @@ private:
 	void signal(int signum) const;
 
 private:
-	pid_t _pid;						///< PID value
-	const std::string _cmd_line;	///< command, which was used to spawn process
-	int _exit_status;				///< exit status of process
-	Status _status;					///< status information, obtained from /proc/<PID>/status
+	pid_t _pid;				///< PID value
+	std::string _cmd_line;	///< command, which was used to spawn process
+	int _exit_status;		///< exit status of process
+	Status _status;			///< status information, obtained from /proc/<PID>/status
 };

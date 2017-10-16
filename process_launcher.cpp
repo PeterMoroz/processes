@@ -12,10 +12,10 @@
 #include <thread>
 #include <vector>
 
-#include "utils.h"
 #include "process.h"
 #include "process_observer.h"
 #include "process_launcher.h"
+
 
 
 ProcessLauncher::ProcessLauncher()
@@ -71,22 +71,12 @@ void ProcessLauncher::run() noexcept
 		cmd = fetch_command();
 		if (!cmd.empty())
 		{
-			std::cout << "PID " << ::getpid() << " command '" << cmd << "'" << std::endl;
-			pid_t pid = ::fork();
-			if (pid < 0)
-			{
-				std::cerr << "fork() failed: " << ::strerror(errno) << std::endl;
-			}
-			else if (pid == 0)
-			{
-				std::cout << "PID " << ::getpid() << " PPID " << ::getppid() << " command '" << cmd << "'" << std::endl;
-				break;
-			}
-			else
-			{
-				std::cout << "PID " << ::getpid() << " pid " << pid << " command '" << cmd << "'" << std::endl;
+			try {
+				Process process;
+				std::cout << "PID " << ::getpid() << " run command '" << cmd << "' in background " << std::endl;
+				process.create(cmd, true);
+				std::cout << "PID " << ::getpid() << " notify listeners about new children, pid " << process.pid() << std::endl;
 				
-				Process process(pid, cmd);
 				std::list<ProcessObserver*>::iterator it = _observers.begin();
 				while (it != _observers.end())
 				{
@@ -94,42 +84,11 @@ void ProcessLauncher::run() noexcept
 					++it;
 				}
 				
-				try {
-					std::thread background_wait = std::thread([=]()
-						{
-							int status = 0;
-							pid_t child_pid = ::waitpid(pid, &status, 0);
-							std::cout << " process " << pid << " finished with status " << status << " and PID " << child_pid << std::endl;					
-						});
-					background_wait.detach();
-				} catch (const std::exception& ex) {
-					std::cerr << "Exception: " << ex.what() << std::endl;
-				}
+			} catch (const std::exception& ex) {
+				std::cerr << "Exception: " << ex.what() << std::endl;
 			}
 		}
 	}
-	
-	if (!cmd.empty())
-	{
-		std::cout << " launcher is going to spawn child process, command: " << cmd << std::endl;
-		std::vector<std::string> arguments = utils::split(cmd, ' ');
-		static constexpr std::size_t MAX_ARGS = 64;
-		char** args = new char*[arguments.size() + 1];	// Memory leak! Move variable to global scope and register cleanup function by means atexit()
-		//std::cout << " Arguments list: " << std::endl;
-		std::size_t idx = 0;
-		for (; idx < arguments.size() && idx < MAX_ARGS; idx++)
-		{
-			//std::cout << arguments[idx] << std::endl;
-			args[idx] = const_cast<char*>(arguments[idx].c_str());
-		}
-		args[idx] = NULL;
-		
-		if (::execvp(args[0], args) == -1)
-		{
-			std::cerr << "execvp() failed: " << ::strerror(errno) << std::endl;
-		}	
-	}
-	
 }
 
 void ProcessLauncher::stop() noexcept

@@ -11,10 +11,18 @@
 #include <exception>
 #include <stdexcept>
 #include <sstream>
+#include <thread>
 
-
+#include "utils.h"
 #include "process.h"
 
+Process::Process()
+	: _pid(-1)
+	, _cmd_line()
+	, _status()
+{
+	
+}
 
 Process::Process(pid_t pid, const std::string& cmd_line)
 	: _pid(pid)
@@ -29,14 +37,77 @@ Process::~Process()
 	// don't release any resource here
 }
 
+void Process::attach(pid_t pid)
+{
+	if (pid <= 0)
+		throw std::logic_error("Invalid PID.");
+		
+	_pid = pid;
+	_cmd_line.clear();
+	_status.clear();
+}
+
+void Process::create(const std::string& cmd_line, bool run_in_background/*=false*/)
+{
+	if (cmd_line.empty())
+		throw std::logic_error("Invalid command line.");
+		
+	pid_t pid = ::fork();
+	if (pid < 0)
+	{
+		char err_msg_buffer[256] = { '\0' };
+		const char* err_msg = ::strerror_r(errno, err_msg_buffer, sizeof(err_msg_buffer));
+		throw std::runtime_error(std::string("fork() failed, details: ").append(err_msg));
+	}
+	
+	if (pid == 0)
+	{
+		std::cout << " start of spawning child process, command: " << cmd_line << std::endl;
+		std::vector<std::string> arguments = utils::split(cmd_line, ' ');
+		static constexpr std::size_t MAX_ARGS = 64;
+		char** args = new char*[arguments.size() + 1];	// Memory leak! Move variable to global scope and register cleanup function by means atexit()
+		//std::cout << " Arguments list: " << std::endl;
+		std::size_t idx = 0;
+		for (; idx < arguments.size() && idx < MAX_ARGS; idx++)
+		{
+			//std::cout << arguments[idx] << std::endl;
+			args[idx] = const_cast<char*>(arguments[idx].c_str());
+		}
+		args[idx] = NULL;
+		
+		if (::execvp(args[0], args) == -1)
+		{
+			char err_msg_buffer[256] = { '\0' };
+			const char* err_msg = ::strerror_r(errno, err_msg_buffer, sizeof(err_msg_buffer));
+			throw std::runtime_error(std::string("execvp() failed, details: ").append(err_msg));			
+		}
+	}
+	else
+	{
+		_pid = pid;
+		_cmd_line = cmd_line;
+		_status.clear();
+		
+		if (run_in_background)
+		{
+			try {
+				std::thread background_wait = std::thread([this]()
+					{
+						pid_t pid = ::waitpid(_pid, &_exit_status, 0);
+						std::cout << " process " << _pid << " finished with status " << _exit_status << " and PID " << pid << std::endl;					
+					});
+				background_wait.detach();
+			} catch (const std::exception& ex) {
+				std::cerr << "Exception: " << ex.what() << std::endl;
+			}
+		} // if (run_in_background)	
+	}
+}
+
 void Process::interrupt() noexcept
 {
 	try {
 		signal(SIGINT);
-		/* To avoid zombies, aprent process have to call waitpid()
-		if (alive())
-			wait(); 
-		*/
 	} catch (const std::exception& ex) {
 		std::cerr << "An error when interrupt process, PID = " << _pid << ".\nDetails: " << ex.what() << std::endl;
 	}
