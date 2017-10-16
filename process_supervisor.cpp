@@ -3,12 +3,13 @@
 #include <chrono>
 #include <iostream>
 
-#include "process_watchdog.h"
+#include "process_launcher.h"
+#include "process_supervisor.h"
 
 
-ProcessWatchdog::ProcessWatchdog(const ProcessRestriction& process_restriction,
-								unsigned watch_delay /*= DEFAULT_WATCH_DELAY*/)
-	: _process_restriction(process_restriction)
+ProcessSupervisor::ProcessSupervisor(ProcessLauncher& process_launcher,
+						unsigned watch_delay/* = DEFAULT_WATCH_DELAY*/)
+	: _process_launcher(process_launcher)
 	, _watch_delay(watch_delay)
 	, _running(false)
 	, _processes_list()
@@ -19,20 +20,20 @@ ProcessWatchdog::ProcessWatchdog(const ProcessRestriction& process_restriction,
 {
 }
 
-ProcessWatchdog::~ProcessWatchdog()
+ProcessSupervisor::~ProcessSupervisor()
 {
 	if (_running)
-		stop();	
+		stop();
 }
 
-void ProcessWatchdog::ProcessWatchdog::run()
+void ProcessSupervisor::run()
 {
 	assert(!_running);
 	
-	_handler_thread = std::thread(&ProcessWatchdog::processes_handler, this);
+	_handler_thread = std::thread(&ProcessSupervisor::processes_handler, this);
 }
 
-void ProcessWatchdog::ProcessWatchdog::stop() noexcept
+void ProcessSupervisor::stop() noexcept
 {
 	try {
 		if (_running)
@@ -46,10 +47,10 @@ void ProcessWatchdog::ProcessWatchdog::stop() noexcept
 		}
 	} catch (const std::exception& ex) {
 		std::cerr << "Exception when handler thread joined: " << ex.what() << std::endl;
-	}
+	}	
 }
 
-void ProcessWatchdog::add_process(const Process& process)
+void ProcessSupervisor::add_process(const Process& process)
 {
 	{
 		std::lock_guard<std::mutex> lg(_proc_list_mutex);
@@ -62,7 +63,7 @@ void ProcessWatchdog::add_process(const Process& process)
 	}
 }
 
-void ProcessWatchdog::processes_handler() noexcept
+void ProcessSupervisor::processes_handler() noexcept
 {
 	try {
 		_running = true;
@@ -83,20 +84,17 @@ void ProcessWatchdog::processes_handler() noexcept
 				while (it != _processes_list.end())
 				{
 					try {
-						it->update_status();
-						if (violates_restrictions(*it))
+						//std::cout << "check whether process " << it->pid() << " is alive." << std::endl;
+						if (!it->alive())
 						{
-							std::cout << "watchdog is going to kill process " 
-								<< it->pid() << "\t" << it->cmd_line() << std::endl;
-							it->interrupt();
-							std::cout << " process " << it->pid() << "\t" << it->cmd_line()
-								<< "\tinterrupted\texit status " << it->exit_status() << std::endl;
+							std::cout << " process " << it->pid() << " isn't alive anymore, restart\t" << it->cmd_line() << std::endl;
+							_process_launcher.add_command(it->cmd_line());
 							it = _processes_list.erase(it);
 							continue;
 						}
 						++it;
 					} catch (const std::exception& ex) {
-						std::cerr << "Exception when testing violation of restrictions: " << ex.what() << std::endl;
+						std::cerr << "Exception when testing status of process " << it->pid() << "\nDetails: " << ex.what() << std::endl;
 						it = _processes_list.erase(it);
 					}
 				}
@@ -108,19 +106,4 @@ void ProcessWatchdog::processes_handler() noexcept
 		std::cerr << "Exception in thread routine: " << ex.what() << std::endl;
 		_running = false;
 	}
-}
-
-bool ProcessWatchdog::violates_restrictions(const Process& process) const
-{
-	const std::string& vm_size_str = process.get_status_field("VmSize");
-	unsigned vm_size_val = std::stoi(vm_size_str);
-	
-	std::cout << "PID: " << process.pid() << "\tVmSize: " << vm_size_val << std::endl;
-	if (vm_size_val > _process_restriction._vm_size_max)
-	{
-		std::cout << "PID: " << process.pid() << ", actual value of VmSize = " << vm_size_val
-			<< ", allowed value of VmSize = " << _process_restriction._vm_size_max << std::endl;
-		return true;
-	}
-	return false;
 }

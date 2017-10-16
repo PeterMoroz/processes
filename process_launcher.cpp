@@ -68,15 +68,15 @@ void ProcessLauncher::run() noexcept
 	while (_running)
 	{
 		cmd.clear();
-		std::cout << "PID " << ::getpid() << ", fetch next command..." << std::endl;
 		if (!_commands.empty())
 		{
+			std::cout << "PID " << ::getpid() << ", fetch next command..." << std::endl;
 			cmd = _commands.front();
 			_commands.pop_front();
 		}
 		else
 		{
-			std::this_thread::sleep_for(std::chrono::seconds(90));
+			std::this_thread::sleep_for(std::chrono::seconds(10));
 		}
 		
 		if (!cmd.empty())
